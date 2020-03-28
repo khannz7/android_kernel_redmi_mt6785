@@ -319,7 +319,7 @@ static void thermal_zone_device_set_polling(struct thermal_zone_device *tz,
 					&tz->poll_queue,
 					msecs_to_jiffies(delay));
 	else
-		cancel_delayed_work_sync(&tz->poll_queue);
+		cancel_delayed_work(&tz->poll_queue);
 }
 
 static void monitor_thermal_zone(struct thermal_zone_device *tz)
@@ -1552,8 +1552,9 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 
 	mutex_unlock(&thermal_list_lock);
 
-	/* thermal_zone_device_set_polling(tz, 0); */
+	cancel_delayed_work_sync(&tz->poll_queue);
 
+	/* thermal_zone_device_set_polling(tz, 0); */
 	thermal_set_governor(tz, NULL);
 
 	thermal_remove_hwmon_sysfs(tz);
