@@ -212,8 +212,11 @@ static ssize_t hw_reset_set(struct device *dev,
 	int ret = -EINVAL;
 	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
 
+/*
 	if (!strncmp(buf, "reset", strlen("reset")))
 		ret = hw_reset(fpc1022);
+*/
+	ret = count;
 
 	return ret ? ret : count;
 }
@@ -240,7 +243,7 @@ static ssize_t wakeup_enable_set(struct device *dev,
 		} else
 			return -EINVAL;
 	} else {
-		fpc1022->wakeup_enabled = true;
+		fpc1022->wakeup_enabled = (!strncmp(buf, "enable", strlen("enable"))) ? true : false;
 		smp_wmb();
 	}
 
@@ -373,9 +376,9 @@ static irqreturn_t fpc1022_irq_handler(int irq, void *handle)
 	 ** since this is interrupt context (other thread...) */
 	smp_rmb();
 
-	/* if (fpc1022->wakeup_enabled) { */
+	 if (fpc1022->wakeup_enabled) {
 	__pm_wakeup_event(fpc1022->ttw_wl, msecs_to_jiffies(FPC_TTW_HOLD_TIME));
-	/* } */
+	 }
 
 	sysfs_notify(&fpc1022->dev->kobj, NULL, dev_attr_irq.attr.name);
 
