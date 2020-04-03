@@ -51,6 +51,8 @@
 #include "mtk_spi_hal.h"
 #endif
 
+#define NON_MIUI_BUILD 1
+
 #ifndef CONFIG_SPI_MT65XX
 #include "mtk_gpio.h"
 #include "mach/gpio_const.h"
@@ -207,13 +209,12 @@ static ssize_t hw_reset_set(struct device *dev,
 			    struct device_attribute *attr, const char *buf,
 			    size_t count)
 {
-	int ret;
+	int ret = -EINVAL;
 	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
 
 	if (!strncmp(buf, "reset", strlen("reset")))
 		ret = hw_reset(fpc1022);
-	else
-		return -EINVAL;
+
 	return ret ? ret : count;
 }
 
@@ -229,14 +230,19 @@ static ssize_t wakeup_enable_set(struct device *dev,
 {
 	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
 
-	if (!strncmp(buf, "enable", strlen("enable"))) {
+	if(!NON_MIUI_BUILD){
+		if (!strncmp(buf, "enable", strlen("enable"))) {
+			fpc1022->wakeup_enabled = true;
+			smp_wmb();
+		} else if (!strncmp(buf, "disable", strlen("disable"))) {
+			fpc1022->wakeup_enabled = false;
+			smp_wmb();
+		} else
+			return -EINVAL;
+	} else {
 		fpc1022->wakeup_enabled = true;
 		smp_wmb();
-	} else if (!strncmp(buf, "disable", strlen("disable"))) {
-		fpc1022->wakeup_enabled = false;
-		smp_wmb();
-	} else
-		return -EINVAL;
+	}
 
 	return count;
 }
@@ -253,15 +259,21 @@ static ssize_t do_wakeup_set(struct device *dev,
 {
 	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
 
-	if (count > 0) {
-		/* Sending power key event creates a toggling
-		   effect that may be desired. It could be
-		   replaced by another event such as KEY_WAKEUP. */
-		input_report_key(fpc1022->idev, KEY_POWER, 1);
-		input_report_key(fpc1022->idev, KEY_POWER, 0);
+	if(NON_MIUI_BUILD || count) {
+		input_report_key(fpc1022->idev, KEY_WAKEUP, 1);
+		input_report_key(fpc1022->idev, KEY_WAKEUP, 0);
 		input_sync(fpc1022->idev);
 	} else {
-		return -EINVAL;
+		if (count > 0 && !NON_MIUI_BUILD) {
+			/* Sending power key event creates a toggling
+		   	effect that may be desired. It could be
+		   	replaced by another event such as KEY_WAKEUP. */
+			input_report_key(fpc1022->idev, KEY_POWER, 1);
+			input_report_key(fpc1022->idev, KEY_POWER, 0);
+			input_sync(fpc1022->idev);
+		} else {
+			return -EINVAL;
+		}
 	}
 
 	return count;
